@@ -18,7 +18,7 @@ LHOST = '0.0.0.0'
 HOST = '127.0.0.1'
 PORT = 9999
 MAX_LEN = 4096  # abitrary max len of submitted cmds
-LOG_FILE = 'ctfrec.log'
+LOG_FILE = 'bashrec.log'
 
 
 class ServerError(BaseException):
