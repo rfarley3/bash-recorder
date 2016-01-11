@@ -1,18 +1,16 @@
+#!/usr/bin/env bash
 SESSID=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 10 | head -n 1)
 export SESSID
 SESSIP=$(ifconfig en0 2>&1 | grep inet[^6] | awk '{print $2}')
 export SESSIP
 function log2ctfref
 {
-    [ -n "$COMP_LINE" ] && return  # do nothing if completing
-    [ "$BASH_COMMAND" = "$PROMPT_COMMAND" ] && return # don't cause a preexec for $PROMPT_COMMAND
+    [ -n "$COMP_LINE" ] && return
+    [ "$BASH_COMMAND" = "$PROMPT_COMMAND" ] && return
     declare cmd
-    # cmd=$(printf %q "$BASH_COMMAND" | base64)
     cmd=$(echo -n $BASH_COMMAND | base64)
-    sess=$$.$PPID.$SESSID
     ts=$(date +%s)
-    # echo "cmd: $cmd u: $USER sess: $sess ip: $SESSIP"
-    # echo post_data: $post_data
+    sess=$$.$PPID.$SESSID
     curl -s \
         --connect-timeout 5 \
         -H "Accept: application/json" \

@@ -1,20 +1,24 @@
+#!/usr/bin/env python
 from __future__ import (
     print_function,
-    division,
 )
-from time import time
+from time import time, sleep
 import sys
 import json
 import requests
 import logging
 import base64
 from bottle import run, route, post, request
+from collections import deque
+from threading import Thread, Lock
 
 
 DEBUG = True
 LHOST = '0.0.0.0'
 HOST = '127.0.0.1'
 PORT = 9999
+MAX_LEN = 4096  # abitrary max len of submitted cmds
+LOG_FILE = 'ctfrec.log'
 
 
 class ServerError(BaseException):
@@ -36,13 +40,32 @@ def load_request(possible_keys):
     return pdata
 
 
+# SSL http://www.socouldanyone.com/2014/01/bottle-with-ssl.html
 class Server(object):
-    def __init__(self, addr=None):
+    def __init__(self, addr=None, log=LOG_FILE):
         self.host = LHOST
         self.port = PORT
         if addr is not None:
             (self.host, self.port) = addr
+        self.log = log
+        self.log_lock = Lock()
+        self.inbound_cmds = deque()
         self.cmds = []
+        self.collector_thread = Thread(target=self.collect_inbound_cmds)
+        self.collector_thread.daemon = True
+        self.collector_thread.start()
+
+    def collect_inbound_cmds(self):
+        while True:
+            while self.inbound_cmds:
+                c = self.inbound_cmds.popleft()
+                c_str = json.dumps(c) + '\n'
+                self.log_lock.acquire()
+                with open(self.log, 'ab') as f:
+                    f.write(c_str)
+                self.cmds.append(c)
+                self.log_lock.release()
+            sleep(1)
 
     def run(self):
         route('/')(self.handle_index)
@@ -79,7 +102,15 @@ class Server(object):
         return json.dumps({'success': success, 'resp': cmds}) + '\n'
 
     def load_cmds(self):
-        return self.cmds
+        cmds = []
+        self.log_lock.acquire()
+        with open(self.log, 'rb') as f:
+            lines = f.readlines()
+        self.log_lock.release()
+        for l in lines:
+            c = json.loads(l)
+            cmds.append(c)
+        return cmds
 
     def handle_cmd_post(self):
         pdata = load_request(['ts', 'cmd', 'src'])
@@ -92,12 +123,14 @@ class Server(object):
         return json.dumps({'success': success, 'resp': resp}) + '\n'
 
     def rec_cmd(self, cmd):
-        self.cmds.append(cmd)
-        # semaphore to lock output or sqlite
         try:
-            msg = 'rec_cmd: %s' % json.dumps(cmd)
+            cmd_str = json.dumps(cmd)
         except TypeError as e:
-            msg = 'rec_cmd: %s, typeerror %s' % (cmd, e)
+            return (False, 'rec_cmd json_typeerror(%s)' % (e, cmd))
+        if len(cmd_str) > MAX_LEN:
+            return (False, 'rec_cmd too long %s' % cmd_str)
+        self.inbound_cmds.append(cmd)
+        msg = 'rec_cmd: %s' % cmd_str
         self.pr_inf(msg)
         return (True, msg)
 
@@ -186,7 +219,7 @@ class Client(object):
             try:
                 decoded = base64.b64decode(j['cmd']).decode('ascii')
             except TypeError as e:
-                # print('TypeError %s' % e)
+                self.pr_dbg('TypeError %s' % e)
                 decoded = j['cmd']
             j['cmd'] = decoded
             cmds.append(j)
