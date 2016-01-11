@@ -7,6 +7,7 @@ import sys
 import json
 import requests
 import logging
+import base64
 from bottle import run, route, post, request
 
 
@@ -25,10 +26,10 @@ class ClientError(BaseException):
 
 
 def load_request(possible_keys):
-    # try:
-    pdata = json.load(request.body)
-    # except ValueError as e:
-    #     pdata = {"ValueError": "%s" % e}
+    try:
+        pdata = json.load(request.body)
+    except ValueError as e:
+        pdata = {"ValueError": "%s" % e}
     for k in possible_keys:
         if k not in pdata:
             pdata[k] = None
@@ -174,8 +175,22 @@ class Client(object):
         except ClientError:
             return []
         return rjson
-        # result is a list of json {cmd, ts, src}
-        # note that cmd is a base64 of the ascii of the actuall command
+
+    def get_cmds_decoded(self):
+        try:
+            rjson = self.get('/cmds')
+        except ClientError:
+            return []
+        cmds = []
+        for j in rjson['resp']:
+            try:
+                decoded = base64.b64decode(j['cmd']).decode('ascii')
+            except TypeError as e:
+                # print('TypeError %s' % e)
+                decoded = j['cmd']
+            j['cmd'] = decoded
+            cmds.append(j)
+        return cmds
 
 
 def getopts(argv):
