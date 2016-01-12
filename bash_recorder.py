@@ -113,7 +113,7 @@ class Server(object):
         return cmds
 
     def handle_cmd_post(self):
-        pdata = load_request(['ts', 'cmd', 'src'])
+        pdata = load_request(['ts', 'cmd', 'src', 'optout'])
         pdata['server_ts'] = time()
         if pdata['src'] is None:
             pdata['src'] = {}
@@ -188,10 +188,11 @@ class Client(object):
             return False
         return rjson['success']
 
-    def cmd(self, cmd, session=None, user=None, ctf_user=None):
+    def cmd(self, cmd, session=None, user=None, ctf_user=None, optout=False):
         opts = {}
         opts['ts'] = time()
         opts['cmd'] = cmd
+        opts['optout'] = optout
         opts['src'] = {}
         opts['src']['session'] = session
         opts['src']['user'] = user
