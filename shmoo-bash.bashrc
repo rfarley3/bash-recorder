@@ -13,9 +13,9 @@ function log2ctfref
     cmd=$(echo -n $BASH_COMMAND | base64)
     ts=$(date +%s)
     sess=$$.$PPID.$SESSID
-	optout="False"
-	if $STATSOPTOUT ; then
-		optout="True"
+    optout="False"
+    if $STATSOPTOUT ; then
+        optout="True"
     fi
     curl -s \
         --connect-timeout 5 \
