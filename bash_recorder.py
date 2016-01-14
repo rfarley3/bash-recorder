@@ -36,10 +36,11 @@ class ClientError(BaseException):
 
 
 def load_request(possible_keys):
+    req = request.body.read()
     try:
-        pdata = json.load(request.body)
+        pdata = json.loads(req)
     except ValueError as e:
-        pdata = {"ValueError": "%s" % e}
+        pdata = {"cmd": "%s" % req, "ValueError": "%s" % e}
     for k in possible_keys:
         if k not in pdata:
             pdata[k] = None
