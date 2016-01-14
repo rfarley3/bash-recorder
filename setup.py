@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='bash_recorder',
-    version='0.0.1',
+    version='0.0.2',
     description='Record all bash history and upload to a REST server',
     author='Ryan Farley',
     author_email='rfarley@mitre.org',
@@ -13,4 +13,9 @@ setup(
         'requests',
         'bottle',
     ),
+    entry_points={
+        'console_scripts': [
+            'bashrecorder = bash_recorder:main',
+        ]
+    },
 )

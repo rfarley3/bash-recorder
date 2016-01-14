@@ -294,7 +294,9 @@ def parse_args(argv):
     return args
 
 
-def main(argv):
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
     args = parse_args(argv)
     backend = Server(
         addr=args['addr'],
