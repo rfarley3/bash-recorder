@@ -6,6 +6,6 @@ def remote_log(msg, user=None):
     data['src']['ctf_user'] = user
     url = 'https://ctf.local:9999/cmd'
     try:
-        resp = requests.post(url, data=json.dumps(data), timeout=2.0)
+        requests.post(url, data=json.dumps(data), timeout=2.0)
     except:  # ConnectionError, HTTPError, Timeout, TooManyRedirects
         pass
