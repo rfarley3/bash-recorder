@@ -8,9 +8,13 @@ import json
 import requests
 import logging
 import base64
-from bottle import run, route, post, request
+import argparse
 from collections import deque
 from threading import Thread, Lock
+from bottle import run, route, post, request
+from bottle import ServerAdapter
+from wsgiref.simple_server import make_server, WSGIRequestHandler
+import ssl
 
 
 DEBUG = True
@@ -19,6 +23,8 @@ HOST = '127.0.0.1'
 PORT = 9999
 MAX_LEN = 4096  # abitrary max len of submitted cmds
 LOG_FILE = 'bashrec.log'
+CERT_FILE = 'server.pem'
+# openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
 
 
 class ServerError(BaseException):
@@ -40,20 +46,51 @@ def load_request(possible_keys):
     return pdata
 
 
-# SSL http://www.socouldanyone.com/2014/01/bottle-with-ssl.html
 class Server(object):
-    def __init__(self, addr=None, log=LOG_FILE):
+    def __init__(self, addr=None, log=LOG_FILE, ssl=False, cert=CERT_FILE):
         self.host = LHOST
         self.port = PORT
+        self.ssl = ssl
+        self.cert = cert
         if addr is not None:
             (self.host, self.port) = addr
         self.log = log
         self.log_lock = Lock()
         self.inbound_cmds = deque()
         self.cmds = []
+        if self.ssl:
+            self.ssl_server = self.gen_ssl_server()
         self.collector_thread = Thread(target=self.collect_inbound_cmds)
         self.collector_thread.daemon = True
         self.collector_thread.start()
+
+    def gen_ssl_server(self):
+        cert_file = self.cert
+        class SSLWSGIRefServer(ServerAdapter):
+            def run(self, handler):
+                # print('calling ssl.run %s' % cert_file)
+                if self.quiet:
+                    class QuietHandler(WSGIRequestHandler):
+                        def log_request(*args, **kw):
+                            pass
+                    self.options['handler_class'] = QuietHandler
+                srv = make_server(self.host, self.port, handler, **self.options)
+                srv.socket = ssl.wrap_socket(
+                    srv.socket,
+                    certfile=cert_file,
+                    server_side=True)
+                srv.serve_forever()
+        self.pr_dbg('Wrapped socket in ssl with cert %s' % self.cert)
+        return SSLWSGIRefServer(host=self.host, port=self.port)
+
+    def run(self):
+        route('/')(self.handle_index)
+        route('/cmds')(self.handle_cmds)
+        post('/cmd')(self.handle_cmd_post)
+        if self.ssl:
+            run(server=self.ssl_server, debug=DEBUG)
+        else:
+            run(host=self.host, port=self.port, debug=DEBUG)
 
     def collect_inbound_cmds(self):
         while True:
@@ -66,12 +103,6 @@ class Server(object):
                 self.cmds.append(c)
                 self.log_lock.release()
             sleep(1)
-
-    def run(self):
-        route('/')(self.handle_index)
-        route('/cmds')(self.handle_cmds)
-        post('/cmd')(self.handle_cmd_post)
-        run(host=self.host, port=self.port, debug=DEBUG)
 
     def pr_dbg(self, msg):
         msg = '%s [DBG] server %s' % (int(time()), msg)
@@ -227,15 +258,52 @@ class Client(object):
         return cmds
 
 
-def getopts(argv):
-    return {}
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        description='Bash Recorder module, stores remote bash history')
+    parser.add_argument(
+        '--ssl', '-s',
+        action='store_true',
+        dest='ssl',
+        default=False,
+        help='use SSL')
+    parser.add_argument(
+        '--cert', '-c',
+        action='store',
+        dest='ssl_cert',
+        default=CERT_FILE,
+        help='path to SSL cert file')
+    parser.add_argument(
+        '--log', '-l',
+        action='store',
+        dest='log_file',
+        default=LOG_FILE,
+        help='path to log file')
+    parser.add_argument(
+        '--port', '-p',
+        action='store',
+        dest='listen_port',
+        default=PORT,
+        help='port to bind listen')
+    results = parser.parse_args()
+    args = {}
+    args['ssl'] = results.ssl
+    args['cert'] = results.ssl_cert
+    args['log'] = results.log_file
+    args['addr'] = (LHOST, results.listen_port)
+    return args
 
 
-def main(opts):
-    backend = Server()
+def main(argv):
+    args = parse_args(argv)
+    backend = Server(
+        addr=args['addr'],
+        log=args['log'],
+        ssl=args['ssl'],
+        cert=args['cert'])
     backend.run()
     return 0
 
 
 if __name__ == '__main__':
-    sys.exit(main(getopts(sys.argv)))
+    sys.exit(main(sys.argv))
