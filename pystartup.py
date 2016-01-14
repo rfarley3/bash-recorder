@@ -1,8 +1,7 @@
-# store in /etc/pystartup
-# in bashrc: export PYTHONSTARTUP=/etc/pystartup
+# store in /etc/pystartup.py
+# in bashrc: export PYTHONSTARTUP=/etc/pystartup.py
 # you will need to pip install readline
 import atexit
-# import rlcompleter
 
 
 def remote_log_history():
@@ -11,12 +10,13 @@ def remote_log_history():
     import requests
     import os
     import json
+    import base64
     cnt = readline.get_current_history_length()
     for i in xrange(cnt):
         cmd = readline.get_history_item(i + 1)
         data = {}
         data['ts'] = time()
-        data['cmd'] = cmd
+        data['cmd'] = base64.b64encode(cmd.encode('ascii'))
         data['optout'] = None
         if 'STATSOPTOUT' in os.environ:
             data['optout'] = os.environ['STATSOPTOUT']
@@ -30,7 +30,7 @@ def remote_log_history():
         if 'SESSID' in os.environ:
             sessid = os.environ['SESSID']
         data['src']['session'] = '%s.%s.%s.py' % (pid, ppid, sessid)
-        url = 'https://ctf.local:9999/cmd'
+        url = 'http://ctf.local:9999/cmd'
         # print('request: %s' % json.dumps(data))
         try:
             requests.post(url, data=json.dumps(data), timeout=2.0)
@@ -40,4 +40,4 @@ def remote_log_history():
 
 
 atexit.register(remote_log_history)
-del atexit, remote_log_history  # rlcompleter
+del atexit, remote_log_history

@@ -1,10 +1,7 @@
 ############ BEGIN CTF Logging
-SESSID=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 10 | head -n 1)
-export SESSID
-SESSIP=$(ifconfig eth0 2>&1 | grep inet[^6] | awk '{print $2}')
-export SESSIP
-STATSOPTOUT=false
-export STATSOPTOUT
+export SESSID=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 10 | head -n 1)
+export SESSIP=$(ifconfig eth0 2>&1 | grep inet[^6] | awk '{print $2}')
+export STATSOPTOUT=false
 function log2ctfref
 {
     [ -n "$COMP_LINE" ] && return
@@ -26,5 +23,8 @@ function log2ctfref
         2>&1 > /dev/null
 }
 trap log2ctfref DEBUG
-echo "Welcome! Bash sessions are logged remotely for CTF reasons. Disable analytics with 'export STATSOPTOUT=true' (ask Ryan if you have questions) and good luck!"
+echo "Welcome! Shell sessions are logged remotely for CTF reasons. Help make future CTFs better! But, if you wish to disable analytics use 'export STATSOPTOUT=true' (ask Ryan if you have questions). Good luck!"
+if [ -f "/etc/pystartup.py"]; then
+    export PYTHONSTARTUP=/etc/pystartup.py
+fi
 ############ END CTF Logging
